@@ -1,6 +1,5 @@
 import jwt from 'jsonwebtoken';
-import bcrypt from 'bcryptjs';
-import User from '../models/User.js';
+import UserService from '../models/UserService.js';
 
 class AuthService {
   constructor() {
@@ -27,34 +26,27 @@ class AuthService {
   // Register new user
   async register(email, password, name) {
     try {
-      // Check if user already exists
-      const existingUser = await User.findOne({ email: email.toLowerCase() });
-      if (existingUser) {
-        throw new Error('User already exists with this email');
-      }
-
-      // Create new user
-      const user = new User({
+      // Create new user in Supabase
+      const user = await UserService.createUser({
         email: email.toLowerCase(),
         password,
         name
       });
 
-      await user.save();
-
       // Generate token
       const token = this.generateToken({
-        id: user._id,
+        id: user.id,
         email: user.email
       });
 
       // Return user data without password
-      const userData = user.toObject();
-      delete userData.password;
+      const userData = { ...user };
+      delete userData.password_hash;
 
       return {
         user: userData,
-        token
+        token,
+        success: true
       };
     } catch (error) {
       throw error;
@@ -65,30 +57,31 @@ class AuthService {
   async login(email, password) {
     try {
       // Find user by email
-      const user = await User.findOne({ email: email.toLowerCase() });
+      const user = await UserService.findByEmail(email.toLowerCase());
       if (!user) {
         throw new Error('Invalid email or password');
       }
 
       // Check password
-      const isPasswordValid = await user.comparePassword(password);
+      const isPasswordValid = await UserService.comparePassword(password, user.password_hash);
       if (!isPasswordValid) {
         throw new Error('Invalid email or password');
       }
 
       // Generate token
       const token = this.generateToken({
-        id: user._id,
+        id: user.id,
         email: user.email
       });
 
       // Return user data without password
-      const userData = user.toObject();
-      delete userData.password;
+      const userData = { ...user };
+      delete userData.password_hash;
 
       return {
         user: userData,
-        token
+        token,
+        success: true
       };
     } catch (error) {
       throw error;
@@ -99,13 +92,17 @@ class AuthService {
   async getUserByToken(token) {
     try {
       const decoded = this.verifyToken(token);
-      const user = await User.findById(decoded.id).select('-password');
-      
+      const user = await UserService.findById(decoded.id);
+
       if (!user) {
         throw new Error('User not found');
       }
 
-      return user;
+      // Remove password hash from user object
+      const userData = { ...user };
+      delete userData.password_hash;
+
+      return userData;
     } catch (error) {
       throw error;
     }
@@ -114,17 +111,17 @@ class AuthService {
   // Update user profile
   async updateProfile(userId, updates) {
     try {
-      const user = await User.findByIdAndUpdate(
-        userId,
-        { $set: updates },
-        { new: true, runValidators: true }
-      ).select('-password');
+      const user = await UserService.updateProfile(userId, updates);
 
       if (!user) {
         throw new Error('User not found');
       }
 
-      return user;
+      // Remove password hash from user object
+      const userData = { ...user };
+      delete userData.password_hash;
+
+      return userData;
     } catch (error) {
       throw error;
     }
@@ -133,20 +130,19 @@ class AuthService {
   // Change password
   async changePassword(userId, currentPassword, newPassword) {
     try {
-      const user = await User.findById(userId);
+      const user = await UserService.findById(userId);
       if (!user) {
         throw new Error('User not found');
       }
 
       // Verify current password
-      const isCurrentPasswordValid = await user.comparePassword(currentPassword);
+      const isCurrentPasswordValid = await UserService.comparePassword(currentPassword, user.password_hash);
       if (!isCurrentPasswordValid) {
         throw new Error('Current password is incorrect');
       }
 
       // Update password
-      user.password = newPassword;
-      await user.save();
+      await UserService.updatePassword(userId, newPassword);
 
       return { message: 'Password updated successfully' };
     } catch (error) {
@@ -157,17 +153,7 @@ class AuthService {
   // Update API keys
   async updateApiKeys(userId, provider, apiKey) {
     try {
-      const user = await User.findById(userId);
-      if (!user) {
-        throw new Error('User not found');
-      }
-
-      // Encrypt API key (simple base64 encoding - in production use proper encryption)
-      const encryptedKey = Buffer.from(apiKey).toString('base64');
-      
-      user.apiKeys[provider] = encryptedKey;
-      await user.save();
-
+      await UserService.updateApiKeys(userId, provider, apiKey);
       return { message: 'API key updated successfully' };
     } catch (error) {
       throw error;
@@ -176,21 +162,7 @@ class AuthService {
 
   // Get decrypted API keys
   getDecryptedApiKeys(user) {
-    const decryptedKeys = {};
-    
-    if (user.apiKeys) {
-      Object.entries(user.apiKeys).forEach(([provider, encryptedKey]) => {
-        if (encryptedKey) {
-          try {
-            decryptedKeys[provider] = Buffer.from(encryptedKey, 'base64').toString('utf-8');
-          } catch (error) {
-            console.error(`Error decrypting ${provider} API key:`, error);
-          }
-        }
-      });
-    }
-    
-    return decryptedKeys;
+    return UserService.getDecryptedApiKeys(user);
   }
 }
 
