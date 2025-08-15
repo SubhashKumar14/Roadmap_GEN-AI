@@ -55,88 +55,35 @@ app.use(limiter);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// MongoDB connection
-let mongoConnected = false;
+// Supabase connection test and initialization
+let supabaseConnected = false;
 
-mongoose.connect(process.env.MONGODB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-  serverSelectionTimeoutMS: 5000,
-  socketTimeoutMS: 45000,
-})
-.then(async () => {
-  console.log('MongoDB connected');
-  mongoConnected = true;
-  
-  // Initialize default achievements
+const initializeSupabase = async () => {
   try {
-    const achievementCount = await Achievement.countDocuments();
-    
-    if (achievementCount === 0) {
-      console.log('Seeding initial achievements...');
-      const achievements = [
-        {
-          id: 'first-steps',
-          title: 'First Steps',
-          description: 'Complete your first task',
-          icon: 'Star',
-          category: 'completion',
-          difficulty: 'bronze',
-          criteria: { type: 'tasks_completed', value: 1, timeframe: 'all_time' },
-          rewards: { experiencePoints: 50, badge: 'first-steps' },
-          order: 1
-        },
-        {
-          id: 'week-warrior',
-          title: 'Week Warrior',
-          description: 'Maintain a 7-day learning streak',
-          icon: 'Flame',
-          category: 'streak',
-          difficulty: 'silver',
-          criteria: { type: 'streak_days', value: 7, timeframe: 'all_time' },
-          rewards: { experiencePoints: 100, badge: 'week-warrior' },
-          order: 2
-        },
-        {
-          id: 'module-master',
-          title: 'Module Master',
-          description: 'Complete 5 learning modules',
-          icon: 'Target',
-          category: 'completion',
-          difficulty: 'silver',
-          criteria: { type: 'tasks_completed', value: 5, timeframe: 'all_time' },
-          rewards: { experiencePoints: 75, badge: 'module-master' },
-          order: 3
-        },
-        {
-          id: 'road-runner',
-          title: 'Road Runner',
-          description: 'Complete your first roadmap',
-          icon: 'Trophy',
-          category: 'special',
-          difficulty: 'gold',
-          criteria: { type: 'roadmaps_completed', value: 1, timeframe: 'all_time' },
-          rewards: { experiencePoints: 200, badge: 'road-runner' },
-          order: 4
-        }
-      ];
-      
-      await Achievement.insertMany(achievements);
-      console.log('Initial achievements seeded');
+    // Test Supabase connection
+    const { data, error } = await supabase.from('users').select('count').limit(1);
+
+    if (error) {
+      console.error('Supabase connection error:', error.message);
+      console.log('Please check your Supabase environment variables');
+      supabaseConnected = false;
+    } else {
+      console.log('✅ Supabase connected successfully');
+      supabaseConnected = true;
     }
   } catch (error) {
-    console.error('Error during initialization:', error);
+    console.error('Supabase initialization error:', error.message);
+    console.log('Server will continue without Supabase - some features may be limited');
+    supabaseConnected = false;
   }
-})
-.catch(err => {
-  console.error('MongoDB connection error:', err.message);
-  console.log('Server will continue without MongoDB - some features may be limited');
-  mongoConnected = false;
-});
+};
 
-// Middleware to check MongoDB connection
+// Initialize Supabase connection
+initializeSupabase();
+
+// Middleware to check Supabase connection
 app.use((req, res, next) => {
-  req.mongoConnected = mongoConnected;
+  req.supabaseConnected = supabaseConnected;
   next();
 });
 
