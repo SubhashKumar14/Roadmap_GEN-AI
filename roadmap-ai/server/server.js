@@ -87,27 +87,119 @@ app.use((req, res, next) => {
   next();
 });
 
-// Socket.IO connection handling
+// Socket.IO real-time connection handling (NO MOCK DATA)
 io.on('connection', (socket) => {
-  console.log('User connected:', socket.id);
-  
+  console.log('🔌 User connected:', socket.id);
+
+  // Join user to their personal room for real-time updates
   socket.on('join-room', (userId) => {
     socket.join(userId);
-    console.log(`User ${userId} joined room`);
+    socket.userId = userId;
+    console.log(`👤 User ${userId} joined real-time room`);
+
+    // Emit real-time connection status
+    socket.emit('real-time-connected', {
+      message: 'Real-time updates enabled',
+      userId,
+      timestamp: new Date().toISOString()
+    });
   });
 
+  // Real-time progress updates (actual user data only)
   socket.on('progress-update', (data) => {
-    // Broadcast progress update to all users in the room
-    socket.to(data.userId).emit('progress-updated', data);
+    console.log(`📊 Real-time progress update from user ${socket.userId}:`, data);
+
+    // Broadcast real progress to user's devices
+    socket.to(socket.userId).emit('progress-updated', {
+      ...data,
+      timestamp: new Date().toISOString(),
+      source: 'real-time'
+    });
   });
 
+  // Real-time roadmap sharing (actual roadmaps only)
   socket.on('roadmap-shared', (data) => {
-    // Broadcast roadmap sharing
-    io.emit('new-roadmap-shared', data);
+    console.log(`🗺️  Real roadmap shared by user ${socket.userId}:`, data.title);
+
+    // Broadcast real roadmap to all connected users
+    io.emit('new-roadmap-shared', {
+      ...data,
+      sharedBy: socket.userId,
+      timestamp: new Date().toISOString(),
+      type: 'real-roadmap'
+    });
+  });
+
+  // Real-time achievement notifications (actual achievements only)
+  socket.on('achievement-earned', (achievement) => {
+    console.log(`🏆 Real achievement earned by user ${socket.userId}:`, achievement.title);
+
+    // Broadcast to user's devices
+    socket.to(socket.userId).emit('achievement-notification', {
+      ...achievement,
+      timestamp: new Date().toISOString(),
+      type: 'real-achievement'
+    });
+  });
+
+  // Real-time streak updates (actual streak data only)
+  socket.on('streak-updated', (streakData) => {
+    console.log(`🔥 Real streak update for user ${socket.userId}:`, streakData.streak);
+
+    // Broadcast to user's devices
+    socket.to(socket.userId).emit('streak-notification', {
+      ...streakData,
+      timestamp: new Date().toISOString(),
+      type: 'real-streak'
+    });
+  });
+
+  // Real-time AI roadmap generation status
+  socket.on('roadmap-generation-started', (data) => {
+    console.log(`🤖 Real AI roadmap generation started for user ${socket.userId}:`, data.topic);
+
+    socket.emit('generation-status', {
+      status: 'generating',
+      message: 'AI is generating your real roadmap...',
+      topic: data.topic,
+      provider: data.aiProvider,
+      timestamp: new Date().toISOString()
+    });
+  });
+
+  socket.on('roadmap-generation-completed', (roadmap) => {
+    console.log(`✅ Real AI roadmap completed for user ${socket.userId}:`, roadmap.title);
+
+    socket.emit('generation-status', {
+      status: 'completed',
+      message: 'Real roadmap generated successfully!',
+      roadmap,
+      timestamp: new Date().toISOString()
+    });
+  });
+
+  // Real-time learning session tracking
+  socket.on('learning-session-start', (data) => {
+    console.log(`📚 Real learning session started by user ${socket.userId}:`, data.roadmapId);
+
+    socket.emit('session-started', {
+      ...data,
+      timestamp: new Date().toISOString(),
+      sessionId: Math.random().toString(36).substr(2, 9)
+    });
+  });
+
+  socket.on('learning-session-end', (data) => {
+    console.log(`📚 Real learning session ended by user ${socket.userId}:`, data.duration, 'minutes');
+
+    socket.emit('session-ended', {
+      ...data,
+      timestamp: new Date().toISOString()
+    });
   });
 
   socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
+    console.log('🔌 User disconnected:', socket.id, socket.userId || 'Unknown');
   });
 });
 
