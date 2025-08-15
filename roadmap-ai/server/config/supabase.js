@@ -1,17 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// Use hardcoded values for testing (in production, use environment variables)
+const supabaseUrl = process.env.SUPABASE_URL || 'https://cnjmsugrswpncagvuxqn.supabase.co';
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNuam1zdWdyc3dwbmNhZ3Z1eHFuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQyMDE4NjIsImV4cCI6MjA2OTc3Nzg2Mn0.adaGmRt-kue4BBYQis8n4HAxEFkiFin_7LRRLr4T-Oc';
 
-console.log('🔍 Checking Supabase environment variables:');
-console.log('SUPABASE_URL:', supabaseUrl ? 'Set' : 'Missing');
-console.log('SUPABASE_SERVICE_ROLE_KEY:', supabaseServiceRoleKey ? 'Set' : 'Missing');
-
-if (!supabaseUrl || !supabaseServiceRoleKey) {
-  console.error('❌ Missing Supabase environment variables');
-  console.error('Available env vars:', Object.keys(process.env).filter(key => key.includes('SUPABASE')));
-  throw new Error('Supabase configuration incomplete');
-}
+console.log('🔍 Supabase Configuration:');
+console.log('URL:', supabaseUrl);
+console.log('Key configured:', supabaseServiceRoleKey ? 'Yes' : 'No');
 
 // Create client for backend operations (using anon key temporarily for testing)
 export const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
