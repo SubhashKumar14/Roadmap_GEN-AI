@@ -155,17 +155,57 @@ const Index = () => {
     }
   };
 
-  const handleRoadmapGenerated = (newRoadmap) => {
-    setRoadmaps(prev => [newRoadmap, ...prev]);
-    setShowGenerator(false);
-    setActiveTab("roadmaps");
-    toast({
-      title: "Roadmap Generated! 🎉",
-      description: `Your "${newRoadmap.title}" roadmap is ready to start.`,
-    });
+  const handleRoadmapGenerated = async (newRoadmap) => {
+    try {
+      console.log('💾 Saving real roadmap to database:', newRoadmap.title);
 
-    // Emit socket event
-    socketService.emitRoadmapShared(newRoadmap);
+      // Save real roadmap to Supabase database (NO MOCK DATA)
+      const savedRoadmap = await fetch(`${import.meta.env.VITE_API_URL}/api/roadmap`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(newRoadmap)
+      });
+
+      if (!savedRoadmap.ok) {
+        throw new Error('Failed to save roadmap to database');
+      }
+
+      const savedRoadmapData = await savedRoadmap.json();
+      console.log('✅ Real roadmap saved to database:', savedRoadmapData.id);
+
+      // Update local state with real database roadmap
+      setRoadmaps(prev => [savedRoadmapData, ...prev]);
+      setShowGenerator(false);
+      setActiveTab("roadmaps");
+
+      toast({
+        title: "Real Roadmap Created! 🎉",
+        description: `Your "${savedRoadmapData.title}" roadmap has been saved and is ready to start.`,
+      });
+
+      // Emit real roadmap sharing event
+      socketService.emitRoadmapShared(savedRoadmapData);
+
+      // Log real activity
+      await progressService.addActivity('roadmap_created');
+
+    } catch (error) {
+      console.error('❌ Error saving real roadmap:', error);
+
+      // Still add to local state as fallback, but show warning
+      setRoadmaps(prev => [newRoadmap, ...prev]);
+      setShowGenerator(false);
+      setActiveTab("roadmaps");
+
+      toast({
+        title: "Roadmap Generated",
+        description: "Roadmap created but may not be synced. Please check your connection.",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleTaskComplete = async (roadmapId, moduleId, taskId) => {
