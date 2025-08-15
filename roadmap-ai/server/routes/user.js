@@ -2,6 +2,7 @@ import express from 'express';
 import { authenticateToken } from '../middleware/authMiddleware.js';
 import UserService from '../models/UserService.js';
 import ProgressService from '../models/ProgressService.js';
+import supabase from '../config/supabase.js';
 
 const router = express.Router();
 
