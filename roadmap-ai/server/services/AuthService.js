@@ -3,7 +3,7 @@ import UserService from '../models/UserService.js';
 
 class AuthService {
   constructor() {
-    this.jwtSecret = process.env.JWT_SECRET;
+    this.jwtSecret = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production';
     this.jwtExpiresIn = process.env.JWT_EXPIRES_IN || '7d';
   }
 
