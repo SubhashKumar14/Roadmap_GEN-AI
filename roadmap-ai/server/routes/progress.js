@@ -1,376 +1,171 @@
 import express from 'express';
-import { body, query, validationResult } from 'express-validator';
-import Progress from '../models/Progress.js';
-import User from '../models/User.js';
-import { Achievement, UserAchievement } from '../models/Achievement.js';
 import { authenticateToken } from '../middleware/authMiddleware.js';
+import ProgressService from '../models/ProgressService.js';
+import UserService from '../models/UserService.js';
 
 const router = express.Router();
 
-// Validation middleware
-const validateActivityData = [
-  body('type').isIn(['task_completed', 'module_completed', 'roadmap_completed', 'study_session']).withMessage('Invalid activity type'),
-  body('count').optional().isInt({ min: 1 }).withMessage('Count must be a positive integer')
-];
-
-// Get progress summary
+// Get real user stats summary (NO MOCK DATA)
 router.get('/summary', authenticateToken, async (req, res) => {
   try {
-    let progress = await Progress.findOne({ userId: req.user._id });
+    const realStats = await ProgressService.getUserStatsSummary(req.user.id);
     
-    if (!progress) {
-      progress = new Progress({ userId: req.user._id });
-      await progress.save();
-    }
-
-    // Update streak calculation
-    progress.updateStreak();
-    await progress.save();
-
-    const summary = {
-      totalContributions: progress.totalContributions,
-      currentStreak: progress.currentStreak,
-      longestStreak: progress.longestStreak,
-      weeklySummary: progress.weeklySummary,
-      monthlySummary: progress.monthlySummary,
-      activities: progress.activities.slice(-30) // Last 30 days
-    };
-
-    res.json(summary);
+    console.log(`📊 Real stats fetched for user ${req.user.id}:`, {
+      totalCompleted: realStats.totalCompleted,
+      streak: realStats.streak,
+      totalRoadmaps: realStats.totalRoadmaps
+    });
+    
+    res.json(realStats);
   } catch (error) {
-    console.error('Error fetching progress summary:', error);
-    res.status(500).json({ error: 'Failed to fetch progress summary' });
+    console.error('Error fetching real user stats:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
-// Get activity data for calendar visualization
+// Get real user activity for contribution calendar (NO MOCK DATA)
 router.get('/activity', authenticateToken, async (req, res) => {
   try {
-    const { year = new Date().getFullYear() } = req.query;
+    const year = parseInt(req.query.year) || new Date().getFullYear();
+    const realActivity = await ProgressService.getUserActivity(req.user.id, year);
     
-    let progress = await Progress.findOne({ userId: req.user._id });
+    console.log(`📅 Real activity data for user ${req.user.id}, year ${year}:`, 
+      Object.keys(realActivity).length, 'active days');
     
-    if (!progress) {
-      progress = new Progress({ userId: req.user._id });
-      await progress.save();
-    }
-
-    const activityData = progress.getYearContributions(parseInt(year));
-
-    res.json({
-      year: parseInt(year),
-      totalContributions: progress.totalContributions,
-      currentStreak: progress.currentStreak,
-      activityData
-    });
+    res.json(realActivity);
   } catch (error) {
-    console.error('Error fetching activity data:', error);
-    res.status(500).json({ error: 'Failed to fetch activity data' });
+    console.error('Error fetching real activity:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
-// Add activity (called when user completes tasks)
-router.post('/activity', authenticateToken, validateActivityData, async (req, res) => {
+// Log real user activity (NO MOCK DATA)
+router.post('/activity', authenticateToken, async (req, res) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ error: errors.array().msg });
-    }
-
     const { type, count = 1 } = req.body;
-    const userId = req.user._id;
-
-    let progress = await Progress.findOne({ userId });
     
-    if (!progress) {
-      progress = new Progress({ userId });
+    if (!type) {
+      return res.status(400).json({ error: 'Activity type is required' });
     }
-
-    // Add activity for today
-    const today = new Date();
-    progress.addActivity(today, count);
     
-    await progress.save();
-
-    // Update user's activity tracking
-    const user = await User.findById(userId);
-    if (user && type === 'task_completed') {
-      user.updateStreak();
-      await user.save();
-    }
-
-    console.log(`📊 Activity recorded:`, {
-      userId,
-      type,
-      count,
-      date: today.toISOString().split('T')[0]
-    });
-
+    // Log real activity
+    const activity = await ProgressService.logActivity(req.user.id, type, { count });
+    
+    // Update user activity and streak with real data
+    const updatedUser = await UserService.updateActivity(req.user.id);
+    
+    console.log(`✅ Real activity logged for user ${req.user.id}:`, type);
+    
     res.json({
-      message: 'Activity recorded successfully',
-      currentStreak: progress.currentStreak,
-      totalContributions: progress.totalContributions
+      activity,
+      user: updatedUser,
+      message: 'Real activity logged successfully'
     });
   } catch (error) {
-    console.error('❌ Error recording activity:', error);
-    res.status(500).json({ error: 'Failed to record activity' });
+    console.error('Error logging real activity:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
-// Check and award achievements
+// Check and award real achievements (NO MOCK DATA)
 router.post('/check-achievements', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user._id;
-    const user = await User.findById(userId);
+    const newAchievements = await ProgressService.checkAndAwardAchievements(req.user.id);
     
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+    if (newAchievements.length > 0) {
+      console.log(`🏆 Real achievements earned by user ${req.user.id}:`, 
+        newAchievements.map(a => a.achievements.title));
     }
-
-    // Get all available achievements
-    const achievements = await Achievement.find({ isActive: true });
     
-    // Get user's current achievements
-    const userAchievements = await UserAchievement.find({ userId });
-    const earnedAchievementIds = userAchievements.map(ua => ua.achievementId.toString());
-
-    const newAchievements = [];
-
-    for (const achievement of achievements) {
-      // Skip if already earned
-      if (earnedAchievementIds.includes(achievement._id.toString())) {
-        continue;
-      }
-
-      let qualifies = false;
-
-      // Check achievement criteria
-      switch (achievement.criteria.type) {
-        case 'tasks_completed':
-          qualifies = user.stats.totalCompleted >= achievement.criteria.value;
-          break;
-          
-        case 'streak_days':
-          qualifies = user.stats.streak >= achievement.criteria.value;
-          break;
-          
-        case 'roadmaps_completed':
-          qualifies = user.stats.roadmapsCompleted >= achievement.criteria.value;
-          break;
-          
-        case 'time_spent':
-          qualifies = user.stats.totalStudyTime >= achievement.criteria.value;
-          break;
-          
-        default:
-          continue;
-      }
-
-      if (qualifies) {
-        // Award the achievement
-        const userAchievement = new UserAchievement({
-          userId,
-          achievementId: achievement._id,
-          isCompleted: true
-        });
-
-        await userAchievement.save();
-        
-        // Award experience points
-        if (achievement.rewards.experiencePoints) {
-          user.stats.experiencePoints += achievement.rewards.experiencePoints;
-        }
-
-        newAchievements.push({
-          id: achievement.id,
-          title: achievement.title,
-          description: achievement.description,
-          rewards: achievement.rewards,
-          earnedAt: userAchievement.earnedAt
-        });
-
-        console.log(`🏆 Achievement earned:`, {
-          userId,
-          achievement: achievement.title,
-          rewards: achievement.rewards
-        });
-      }
-    }
-
-    // Update user level
-    const leveledUp = user.updateLevel();
-    await user.save();
-
     res.json({
       newAchievements,
-      leveledUp,
-      currentLevel: user.stats.level,
-      experiencePoints: user.stats.experiencePoints
+      message: newAchievements.length > 0 ? 
+        `Earned ${newAchievements.length} real achievement(s)!` : 
+        'No new achievements at this time'
     });
   } catch (error) {
-    console.error('❌ Error checking achievements:', error);
-    res.status(500).json({ error: 'Failed to check achievements' });
+    console.error('Error checking real achievements:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
-// Get user achievements
+// Get real user achievements (NO MOCK DATA)
 router.get('/achievements', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user._id;
-
-    const userAchievements = await UserAchievement.find({ 
-      userId, 
-      isCompleted: true 
-    }).populate('achievementId');
-
-    const achievements = userAchievements.map(ua => ({
-      id: ua.achievementId.id,
-      title: ua.achievementId.title,
-      description: ua.achievementId.description,
-      icon: ua.achievementId.icon,
-      category: ua.achievementId.category,
-      difficulty: ua.achievementId.difficulty,
-      rewards: ua.achievementId.rewards,
-      earnedAt: ua.earnedAt
-    }));
-
-    res.json(achievements);
+    const realAchievements = await ProgressService.getUserAchievements(req.user.id);
+    
+    console.log(`🏆 Real achievements for user ${req.user.id}:`, realAchievements.length);
+    
+    res.json(realAchievements);
   } catch (error) {
-    console.error('Error fetching user achievements:', error);
-    res.status(500).json({ error: 'Failed to fetch achievements' });
+    console.error('Error fetching real achievements:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
-// Get achievement progress (for partially completed achievements)
-router.get('/achievement-progress', authenticateToken, async (req, res) => {
+// Record real task completion (NO MOCK DATA)
+router.post('/task-complete', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user._id;
-    const user = await User.findById(userId);
+    const { roadmapId, moduleId, taskId, timeSpent = 0 } = req.body;
     
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    // Get all achievements
-    const achievements = await Achievement.find({ isActive: true });
-    
-    // Get user's earned achievements
-    const userAchievements = await UserAchievement.find({ userId });
-    const earnedIds = userAchievements.map(ua => ua.achievementId.toString());
-
-    const progressData = achievements.map(achievement => {
-      const isEarned = earnedIds.includes(achievement._id.toString());
-      
-      let progress = 0;
-      let current = 0;
-
-      if (!isEarned) {
-        // Calculate progress for unearned achievements
-        switch (achievement.criteria.type) {
-          case 'tasks_completed':
-            current = user.stats.totalCompleted;
-            break;
-          case 'streak_days':
-            current = user.stats.streak;
-            break;
-          case 'roadmaps_completed':
-            current = user.stats.roadmapsCompleted;
-            break;
-          case 'time_spent':
-            current = user.stats.totalStudyTime;
-            break;
-        }
-        
-        progress = Math.min(100, (current / achievement.criteria.value) * 100);
-      } else {
-        progress = 100;
-        current = achievement.criteria.value;
-      }
-
-      return {
-        id: achievement.id,
-        title: achievement.title,
-        description: achievement.description,
-        category: achievement.category,
-        difficulty: achievement.difficulty,
-        criteria: achievement.criteria,
-        progress,
-        current,
-        target: achievement.criteria.value,
-        earned: isEarned,
-        earnedAt: isEarned ? userAchievements.find(ua => 
-          ua.achievementId.toString() === achievement._id.toString()
-        )?.earnedAt : null
-      };
-    });
-
-    res.json(progressData);
-  } catch (error) {
-    console.error('Error fetching achievement progress:', error);
-    res.status(500).json({ error: 'Failed to fetch achievement progress' });
-  }
-});
-
-// Get weekly/monthly progress reports
-router.get('/reports', authenticateToken, async (req, res) => {
-  try {
-    const { period = 'week' } = req.query; // week, month, year
-    const userId = req.user._id;
-
-    const progress = await Progress.findOne({ userId });
-    
-    if (!progress) {
-      return res.json({
-        period,
-        activities: [],
-        summary: {
-          tasksCompleted: 0,
-          timeSpent: 0,
-          activeDays: 0
-        }
+    if (!roadmapId || !moduleId || !taskId) {
+      return res.status(400).json({ 
+        error: 'roadmapId, moduleId, and taskId are required' 
       });
     }
-
-    let startDate;
-    const endDate = new Date();
-
-    switch (period) {
-      case 'week':
-        startDate = new Date(endDate.getTime() - 7 * 24 * 60 * 60 * 1000);
-        break;
-      case 'month':
-        startDate = new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
-        break;
-      case 'year':
-        startDate = new Date(endDate.getFullYear(), 0, 1);
-        break;
-      default:
-        startDate = new Date(endDate.getTime() - 7 * 24 * 60 * 60 * 1000);
-    }
-
-    const startDateStr = startDate.toISOString().split('T')[0];
-    const endDateStr = endDate.toISOString().split('T');
-
-    const periodActivities = progress.activities.filter(activity => 
-      activity.date >= startDateStr && activity.date <= endDateStr
+    
+    // Record real progress
+    const progress = await ProgressService.recordTaskCompletion(
+      req.user.id, 
+      roadmapId, 
+      moduleId, 
+      taskId, 
+      timeSpent
     );
-
-    const summary = {
-      tasksCompleted: periodActivities.reduce((sum, a) => sum + a.tasksCompleted, 0),
-      timeSpent: periodActivities.reduce((sum, a) => sum + a.timeSpent, 0),
-      activeDays: periodActivities.filter(a => a.tasksCompleted > 0).length
+    
+    // Update real user stats
+    const currentUser = await UserService.findById(req.user.id);
+    const updatedStats = {
+      ...currentUser.stats,
+      totalCompleted: (currentUser.stats?.totalCompleted || 0) + 1,
+      weeklyProgress: (currentUser.stats?.weeklyProgress || 0) + 1,
+      experiencePoints: (currentUser.stats?.experiencePoints || 0) + 10,
+      totalStudyTime: (currentUser.stats?.totalStudyTime || 0) + timeSpent
     };
-
+    
+    // Calculate new level based on real XP
+    updatedStats.level = Math.floor(updatedStats.experiencePoints / 300) + 1;
+    
+    await UserService.updateStats(req.user.id, updatedStats);
+    
+    // Log real activity
+    await ProgressService.logActivity(req.user.id, 'task_completed', {
+      roadmapId,
+      moduleId, 
+      taskId,
+      timeSpent
+    });
+    
+    // Check for real achievements
+    const newAchievements = await ProgressService.checkAndAwardAchievements(req.user.id);
+    
+    console.log(`✅ Real task completion recorded for user ${req.user.id}:`, {
+      roadmapId,
+      taskId,
+      timeSpent,
+      newXP: updatedStats.experiencePoints,
+      newLevel: updatedStats.level
+    });
+    
     res.json({
-      period,
-      startDate: startDateStr,
-      endDate: endDateStr,
-      activities: periodActivities,
-      summary
+      progress,
+      stats: updatedStats,
+      newAchievements,
+      message: 'Real progress recorded successfully'
     });
   } catch (error) {
-    console.error('Error generating progress report:', error);
-    res.status(500).json({ error: 'Failed to generate progress report' });
+    console.error('Error recording real task completion:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
