@@ -4,7 +4,6 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 
 // Import routes
@@ -14,8 +13,8 @@ import roadmapRoutes from './routes/roadmap.js';
 import progressRoutes from './routes/progress.js';
 import userRoutes from './routes/user.js';
 
-// Import models
-import { Achievement } from './models/Achievement.js';
+// Import Supabase
+import supabase from './config/supabase.js';
 
 dotenv.config();
 
