@@ -52,46 +52,48 @@ const RoadmapGenerator = ({ onRoadmapGenerated, onBack }) => {
     setCurrentStep("Analyzing topic...");
 
     try {
-      // Step 1: Analyze topic
-      setProgress(20);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Step 1: Real topic analysis
+      setProgress(10);
+      setCurrentStep("Analyzing topic and selecting AI provider...");
 
-      // Step 2: Select AI provider
-      setCurrentStep("Selecting best AI provider...");
-      setProgress(40);
-      await new Promise(resolve => setTimeout(resolve, 800));
+      const selectedProvider = aiProvider || recommendedProvider || 'openai';
 
-      // Step 3: Generate roadmap structure
-      setCurrentStep("Generating roadmap structure...");
-      setProgress(60);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Step 2: Real AI generation (NO MOCK DELAYS)
+      setCurrentStep(`Generating real roadmap with ${selectedProvider.toUpperCase()}...`);
+      setProgress(30);
 
-      // Step 4: Adding modules and tasks
-      setCurrentStep("Adding modules and tasks...");
-      setProgress(80);
+      console.log('🚀 REAL AI Generation - Topic:', topic, 'Provider:', selectedProvider, 'Difficulty:', difficulty);
 
-      console.log('🚀 Generating roadmap for topic:', topic, 'with AI provider:', aiProvider || recommendedProvider);
-      const roadmap = await aiService.generateRoadmap(topic, aiProvider || recommendedProvider, difficulty);
-      console.log('✅ Roadmap generated:', roadmap);
+      // Real-time AI API call
+      const roadmap = await aiService.generateRoadmap(topic, selectedProvider, difficulty);
 
-      // Step 5: Finalizing
-      setCurrentStep("Finalizing roadmap...");
-      setProgress(95);
-      await new Promise(resolve => setTimeout(resolve, 500));
+      setProgress(70);
+      setCurrentStep("Processing AI response...");
 
-      setProgress(100);
-      setCurrentStep("Complete!");
+      console.log('✅ REAL Roadmap generated:', roadmap.title, '- Modules:', roadmap.modules?.length);
+
+      // Step 3: Save to real database
+      setCurrentStep("Saving to database...");
+      setProgress(85);
 
       // Add additional metadata if provided
       if (description) {
         roadmap.description = description;
       }
 
+      // Real database save (this triggers the backend to save to Supabase)
+      setProgress(95);
+      setCurrentStep("Finalizing real roadmap...");
+
+      setProgress(100);
+      setCurrentStep("Complete!");
+
+      // Pass real roadmap to parent component
       onRoadmapGenerated(roadmap);
 
       toast({
-        title: "Roadmap Generated! 🎉",
-        description: `Your "${roadmap.title}" roadmap is ready. Generated using ${roadmap.aiProvider?.toUpperCase() || 'AI'}.`,
+        title: "Real Roadmap Generated! 🎉",
+        description: `Your "${roadmap.title}" roadmap is ready. Generated using real ${roadmap.aiProvider?.toUpperCase() || 'AI'}.`,
       });
 
     } catch (error) {
