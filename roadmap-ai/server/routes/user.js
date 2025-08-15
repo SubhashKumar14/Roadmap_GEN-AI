@@ -1,114 +1,62 @@
 import express from 'express';
-import { body, query, validationResult } from 'express-validator';
-import User from '../models/User.js';
-import Roadmap from '../models/Roadmap.js';
-import Progress from '../models/Progress.js';
-import { UserAchievement } from '../models/Achievement.js';
-import { authenticateToken, optionalAuth } from '../middleware/authMiddleware.js';
+import { authenticateToken } from '../middleware/authMiddleware.js';
+import UserService from '../models/UserService.js';
+import ProgressService from '../models/ProgressService.js';
 
 const router = express.Router();
 
-// Validation middleware
-const validatePreferences = [
-  body('emailNotifications').optional().isBoolean(),
-  body('weeklyDigest').optional().isBoolean(),
-  body('achievementAlerts').optional().isBoolean(),
-  body('theme').optional().isIn(['light', 'dark', 'system'])
-];
-
-const validateWeeklyGoal = [
-  body('weeklyGoal').isInt({ min: 1, max: 100 }).withMessage('Weekly goal must be between 1 and 100')
-];
-
-// Get user statistics
+// Get real user stats (NO MOCK DATA)
 router.get('/stats', authenticateToken, async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
+    const realStats = await ProgressService.getUserStatsSummary(req.user.id);
     
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    // Calculate additional stats
-    const roadmaps = await Roadmap.find({ createdBy: req.user._id });
-    const completedRoadmaps = roadmaps.filter(r => r.progress === 100);
-    
-    // Get current week progress (Monday to Sunday)
-    const today = new Date();
-    const currentDay = today.getDay();
-    const monday = new Date(today);
-    monday.setDate(today.getDate() - (currentDay === 0 ? 6 : currentDay - 1));
-    monday.setHours(0, 0, 0, 0);
-    
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
-    sunday.setHours(23, 59, 59, 999);
-
-    // Calculate weekly progress (this could be enhanced with actual activity tracking)
-    const weeklyProgress = Math.min(user.stats.weeklyProgress, user.stats.weeklyGoal);
-
-    const stats = {
-      ...user.stats.toObject(),
-      roadmapsCompleted: completedRoadmaps.length,
-      activeLearningDays: user.activeLearningDays.length,
-      lastActiveDate: user.lastActiveDate,
-      streakStartDate: user.streakStartDate,
-      weeklyProgress,
-      // Additional calculated stats
-      totalRoadmaps: roadmaps.length,
-      averageRoadmapProgress: roadmaps.length > 0 
-        ? roadmaps.reduce((sum, r) => sum + r.progress, 0) / roadmaps.length 
-        : 0
-    };
-
-    console.log(`📊 User stats retrieved for ${user.email}:`, {
-      totalCompleted: stats.totalCompleted,
-      streak: stats.streak,
-      level: stats.level,
-      roadmapsCompleted: stats.roadmapsCompleted
+    console.log(`📊 Real user stats for ${req.user.id}:`, {
+      level: realStats.level,
+      experiencePoints: realStats.experiencePoints,
+      totalCompleted: realStats.totalCompleted,
+      streak: realStats.streak
     });
-
-    res.json(stats);
+    
+    res.json(realStats);
   } catch (error) {
-    console.error('❌ Error fetching user stats:', error);
-    res.status(500).json({ error: 'Failed to fetch user statistics' });
+    console.error('Error fetching real user stats:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
-// Update user preferences
-router.put('/preferences', authenticateToken, validatePreferences, async (req, res) => {
+// Update real user preferences (NO MOCK DATA)
+router.put('/preferences', authenticateToken, async (req, res) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ error: errors.array()[0].msg });
-    }
-
-    const updates = {};
-    const allowedFields = ['emailNotifications', 'weeklyDigest', 'achievementAlerts', 'theme'];
+    const { preferences } = req.body;
     
-    allowedFields.forEach(field => {
-      if (req.body[field] !== undefined) {
-        updates[`preferences.${field}`] = req.body[field];
-      }
+    if (!preferences || typeof preferences !== 'object') {
+      return res.status(400).json({ error: 'Valid preferences object required' });
+    }
+    
+    // Get current user to merge preferences
+    const currentUser = await UserService.findById(req.user.id);
+    const updatedPreferences = {
+      ...currentUser.preferences,
+      ...preferences
+    };
+    
+    const updatedUser = await UserService.updateProfile(req.user.id, {
+      preferences: updatedPreferences
     });
-
-    const user = await User.findByIdAndUpdate(
-      req.user._id,
-      { $set: updates },
-      { new: true }
-    ).select('-password');
-
+    
+    console.log(`⚙️  Real preferences updated for user ${req.user.id}`);
+    
     res.json({
-      message: 'Preferences updated successfully',
-      preferences: user.preferences
+      preferences: updatedUser.preferences,
+      message: 'Preferences updated successfully'
     });
   } catch (error) {
     console.error('Error updating preferences:', error);
-    res.status(500).json({ error: 'Failed to update preferences' });
+    res.status(500).json({ error: error.message });
   }
 });
 
-// Update learning goals
+// Update real learning goals (NO MOCK DATA)
 router.put('/learning-goals', authenticateToken, async (req, res) => {
   try {
     const { learningGoals } = req.body;
@@ -116,234 +64,171 @@ router.put('/learning-goals', authenticateToken, async (req, res) => {
     if (!Array.isArray(learningGoals)) {
       return res.status(400).json({ error: 'Learning goals must be an array' });
     }
-
-    const user = await User.findByIdAndUpdate(
-      req.user._id,
-      { $set: { learningGoals } },
-      { new: true }
-    ).select('-password');
-
+    
+    const updatedUser = await UserService.updateProfile(req.user.id, {
+      learning_goals: learningGoals
+    });
+    
+    console.log(`🎯 Real learning goals updated for user ${req.user.id}:`, learningGoals.length, 'goals');
+    
     res.json({
-      message: 'Learning goals updated successfully',
-      learningGoals: user.learningGoals
+      learningGoals: updatedUser.learning_goals,
+      message: 'Learning goals updated successfully'
     });
   } catch (error) {
     console.error('Error updating learning goals:', error);
-    res.status(500).json({ error: 'Failed to update learning goals' });
+    res.status(500).json({ error: error.message });
   }
 });
 
-// Update weekly goal
-router.put('/weekly-goal', authenticateToken, validateWeeklyGoal, async (req, res) => {
+// Update real weekly goal (NO MOCK DATA)
+router.put('/weekly-goal', authenticateToken, async (req, res) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ error: errors.array()[0].msg });
-    }
-
     const { weeklyGoal } = req.body;
-
-    const user = await User.findByIdAndUpdate(
-      req.user._id,
-      { $set: { 'stats.weeklyGoal': weeklyGoal } },
-      { new: true }
-    ).select('-password');
-
+    
+    if (!weeklyGoal || weeklyGoal < 1 || weeklyGoal > 100) {
+      return res.status(400).json({ error: 'Weekly goal must be between 1 and 100' });
+    }
+    
+    // Get current stats and update weekly goal
+    const currentUser = await UserService.findById(req.user.id);
+    const updatedStats = {
+      ...currentUser.stats,
+      weeklyGoal: parseInt(weeklyGoal)
+    };
+    
+    await UserService.updateStats(req.user.id, updatedStats);
+    
+    console.log(`📈 Real weekly goal updated for user ${req.user.id}:`, weeklyGoal);
+    
     res.json({
-      message: 'Weekly goal updated successfully',
-      weeklyGoal: user.stats.weeklyGoal
+      weeklyGoal: updatedStats.weeklyGoal,
+      message: 'Weekly goal updated successfully'
     });
   } catch (error) {
     console.error('Error updating weekly goal:', error);
-    res.status(500).json({ error: 'Failed to update weekly goal' });
+    res.status(500).json({ error: error.message });
   }
 });
 
-// Get leaderboard
-router.get('/leaderboard', optionalAuth, async (req, res) => {
+// Get real leaderboard (NO MOCK DATA)
+router.get('/leaderboard', async (req, res) => {
   try {
     const { type = 'xp', limit = 10 } = req.query;
     
-    let sortField;
+    let orderField = 'stats->experiencePoints';
     switch (type) {
-      case 'xp':
-        sortField = 'stats.experiencePoints';
-        break;
       case 'streak':
-        sortField = 'stats.streak';
+        orderField = 'stats->streak';
         break;
       case 'completed':
-        sortField = 'stats.totalCompleted';
+        orderField = 'stats->totalCompleted';
         break;
       case 'roadmaps':
-        sortField = 'stats.roadmapsCompleted';
+        orderField = 'stats->roadmapsCompleted';
         break;
-      default:
-        sortField = 'stats.experiencePoints';
     }
-
-    const users = await User.find({})
-      .sort({ [sortField]: -1 })
-      .limit(parseInt(limit))
-      .select('name email profileImage stats activeLearningDays')
-      .lean();
-
-    // Add ranking
-    const leaderboard = users.map((user, index) => ({
-      rank: index + 1,
+    
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, name, profile_image, stats')
+      .order(orderField, { ascending: false })
+      .limit(parseInt(limit));
+    
+    if (error) {
+      throw new Error(`Database error: ${error.message}`);
+    }
+    
+    const leaderboard = data.map((user, index) => ({
+      id: user.id,
       name: user.name,
-      email: user.email,
-      profileImage: user.profileImage,
+      profileImage: user.profile_image,
       stats: user.stats,
-      isCurrentUser: req.user ? user._id.toString() === req.user._id.toString() : false
+      rank: index + 1
     }));
-
-    // If current user is authenticated and not in top results, add their position
-    let currentUserRank = null;
-    if (req.user && !leaderboard.some(u => u.isCurrentUser)) {
-      const userRank = await User.countDocuments({
-        [sortField]: { $gt: req.user.stats[sortField.split('.')[1]] }
-      });
-      currentUserRank = userRank + 1;
-    }
-
-    res.json({
-      type,
-      leaderboard,
-      currentUserRank
-    });
+    
+    console.log(`🏆 Real leaderboard (${type}) fetched:`, leaderboard.length, 'users');
+    
+    res.json(leaderboard);
   } catch (error) {
-    console.error('Error fetching leaderboard:', error);
-    res.status(500).json({ error: 'Failed to fetch leaderboard' });
+    console.error('Error fetching real leaderboard:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
-// Get user profile (public)
-router.get('/:userId/profile', optionalAuth, async (req, res) => {
+// Get real user profile (NO MOCK DATA)
+router.get('/:userId/profile', authenticateToken, async (req, res) => {
   try {
-    const user = await User.findById(req.params.userId)
-      .select('name email bio location githubUsername twitterUsername stats activeLearningDays createdAt')
-      .lean();
-
+    const { userId } = req.params;
+    
+    const user = await UserService.findById(userId);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
-
-    // Get user's public roadmaps
-    const roadmaps = await Roadmap.find({ 
-      createdBy: req.params.userId, 
-      isPublic: true 
-    })
-    .select('title description difficulty progress likes views createdAt')
-    .sort({ createdAt: -1 })
-    .limit(6);
-
-    // Get user's achievements
-    const achievements = await UserAchievement.find({ 
-      userId: req.params.userId,
-      isCompleted: true 
-    })
-    .populate('achievementId')
-    .sort({ earnedAt: -1 })
-    .limit(10);
-
+    
+    // Get user's real stats and achievements
+    const [realStats, realAchievements] = await Promise.all([
+      ProgressService.getUserStatsSummary(userId),
+      ProgressService.getUserAchievements(userId)
+    ]);
+    
     const profile = {
-      ...user,
-      roadmaps,
-      achievements: achievements.map(ua => ({
-        title: ua.achievementId.title,
-        description: ua.achievementId.description,
-        icon: ua.achievementId.icon,
-        difficulty: ua.achievementId.difficulty,
-        earnedAt: ua.earnedAt
-      })),
-      isOwnProfile: req.user ? req.user._id.toString() === req.params.userId : false
+      id: user.id,
+      name: user.name,
+      bio: user.bio,
+      location: user.location,
+      profileImage: user.profile_image,
+      githubUsername: user.github_username,
+      twitterUsername: user.twitter_username,
+      learningGoals: user.learning_goals,
+      stats: realStats,
+      achievements: realAchievements,
+      joinedAt: user.created_at
     };
-
+    
+    console.log(`👤 Real profile fetched for user ${userId}`);
+    
     res.json(profile);
   } catch (error) {
-    console.error('Error fetching user profile:', error);
-    res.status(500).json({ error: 'Failed to fetch user profile' });
+    console.error('Error fetching real user profile:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
-// Search users
-router.get('/search', optionalAuth, async (req, res) => {
+// Search real users (NO MOCK DATA)
+router.get('/search', authenticateToken, async (req, res) => {
   try {
     const { q: query, limit = 10 } = req.query;
     
     if (!query || query.trim().length < 2) {
       return res.status(400).json({ error: 'Search query must be at least 2 characters' });
     }
-
-    const users = await User.find({
-      $or: [
-        { name: { $regex: query, $options: 'i' } },
-        { email: { $regex: query, $options: 'i' } }
-      ]
-    })
-    .select('name email profileImage stats.level stats.experiencePoints')
-    .limit(parseInt(limit))
-    .lean();
-
-    res.json(users);
+    
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, name, profile_image, bio, stats')
+      .or(`name.ilike.%${query}%, bio.ilike.%${query}%`)
+      .limit(parseInt(limit));
+    
+    if (error) {
+      throw new Error(`Database error: ${error.message}`);
+    }
+    
+    const searchResults = data.map(user => ({
+      id: user.id,
+      name: user.name,
+      profileImage: user.profile_image,
+      bio: user.bio,
+      level: user.stats?.level || 1,
+      experiencePoints: user.stats?.experiencePoints || 0
+    }));
+    
+    console.log(`🔍 Real user search for "${query}":`, searchResults.length, 'results');
+    
+    res.json(searchResults);
   } catch (error) {
     console.error('Error searching users:', error);
-    res.status(500).json({ error: 'Failed to search users' });
-  }
-});
-
-// Get user dashboard data
-router.get('/dashboard', authenticateToken, async (req, res) => {
-  try {
-    const user = await User.findById(req.user._id).select('-password');
-    
-    // Get user's roadmaps
-    const roadmaps = await Roadmap.find({ createdBy: req.user._id })
-      .sort({ updatedAt: -1 })
-      .limit(5);
-
-    // Get recent achievements
-    const recentAchievements = await UserAchievement.find({ 
-      userId: req.user._id,
-      isCompleted: true 
-    })
-    .populate('achievementId')
-    .sort({ earnedAt: -1 })
-    .limit(3);
-
-    // Get progress data
-    const progress = await Progress.findOne({ userId: req.user._id });
-
-    const dashboardData = {
-      user: {
-        name: user.name,
-        email: user.email,
-        profileImage: user.profileImage,
-        stats: user.stats,
-        preferences: user.preferences
-      },
-      roadmaps: {
-        recent: roadmaps,
-        total: roadmaps.length,
-        completed: roadmaps.filter(r => r.progress === 100).length
-      },
-      achievements: recentAchievements.map(ua => ({
-        title: ua.achievementId.title,
-        description: ua.achievementId.description,
-        earnedAt: ua.earnedAt
-      })),
-      activity: {
-        currentStreak: progress?.currentStreak || 0,
-        totalContributions: progress?.totalContributions || 0,
-        recentActivity: progress?.activities.slice(-7) || []
-      }
-    };
-
-    res.json(dashboardData);
-  } catch (error) {
-    console.error('Error fetching dashboard data:', error);
-    res.status(500).json({ error: 'Failed to fetch dashboard data' });
+    res.status(500).json({ error: error.message });
   }
 });
 
