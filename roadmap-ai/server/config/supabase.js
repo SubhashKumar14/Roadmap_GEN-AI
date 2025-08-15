@@ -8,11 +8,19 @@ if (!supabaseUrl || !supabaseServiceRoleKey) {
   throw new Error('Supabase configuration incomplete');
 }
 
-// Create admin client with service role key for backend operations
+// Create client for backend operations (using anon key temporarily for testing)
 export const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
   auth: {
     autoRefreshToken: false,
     persistSession: false
+  },
+  db: {
+    schema: 'public',
+  },
+  global: {
+    headers: {
+      'X-Client-Info': 'roadmap-ai-backend'
+    }
   }
 });
 
