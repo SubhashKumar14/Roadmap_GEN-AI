@@ -3,8 +3,12 @@ import UserService from '../models/UserService.js';
 
 class AuthService {
   constructor() {
-    this.jwtSecret = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production';
+    this.jwtSecret = process.env.JWT_SECRET;
     this.jwtExpiresIn = process.env.JWT_EXPIRES_IN || '7d';
+
+    if (!this.jwtSecret) {
+      throw new Error('JWT_SECRET environment variable is required');
+    }
   }
 
   // Generate JWT token
