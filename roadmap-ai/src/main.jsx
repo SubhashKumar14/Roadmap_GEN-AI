@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.jsx';
 import './index.css';
@@ -9,7 +9,11 @@ if (!rootElement) {
 } else {
   console.log('✅ Root element found, mounting React app...');
   try {
-    createRoot(rootElement).render(<App />);
+    createRoot(rootElement).render(
+      <StrictMode>
+        <App />
+      </StrictMode>
+    );
     console.log('✅ React app mounted successfully');
   } catch (error) {
     console.error('❌ Failed to mount React app:', error);
