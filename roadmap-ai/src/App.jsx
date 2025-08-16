@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
-import { AuthProvider, useAuth } from './hooks/useAuth.js'
+import { AuthProvider, useAuth } from './hooks/useAuth.jsx'
 import Header from './components/layout/Header.jsx'
 
 // Pages
