@@ -1,4 +1,4 @@
-import { cn } from '../..utils.js'
+import { cn } from '../../lib/utils.js'
 
 const Button = ({ className, variant = 'default', size = 'default', children, ...props }) => {
   const variants = {
