@@ -1,15 +1,15 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
-import { AuthProvider, useAuth } from '.useAuth.js'
-import Header from '.Header.jsx'
+import { AuthProvider, useAuth } from './hooks/useAuth.js'
+import Header from './components/layout/Header.jsx'
 
 // Pages
-import Dashboard from '.Dashboard.jsx'
-import Login from '.Login.jsx'
-import Register from '.Register.jsx'
-import GeneratePage from '.GeneratePage.jsx'
-import RoadmapPage from '.RoadmapPage.jsx'
-import RoadmapsPage from '.RoadmapsPage.jsx'
+import Dashboard from './pages/Dashboard.jsx'
+import Login from './pages/Login.jsx'
+import Register from './pages/Register.jsx'
+import GeneratePage from './pages/GeneratePage.jsx'
+import RoadmapPage from './pages/RoadmapPage.jsx'
+import RoadmapsPage from './pages/RoadmapsPage.jsx'
 
 // Protected Route wrapper
 const ProtectedRoute = ({ children }) => {
