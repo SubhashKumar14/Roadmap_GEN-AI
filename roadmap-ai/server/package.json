@@ -1,0 +1,16 @@
+{
+  "name": "roadmap-ai-websocket-server",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0",
+    "@supabase/supabase-js": "^2.45.4",
+    "axios": "^1.11.0",
+    "dotenv": "^16.4.5",
+    "uuid": "^10.0.0"
+  }
+}
