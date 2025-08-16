@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { useAuth } from '../hooks/useAuth.js'
+import { useAuth } from '../hooks/useAuth.jsx'
 import RoadmapViewer from '../components/roadmap/RoadmapViewer.jsx'
 import { db } from '../lib/supabase.js'
 

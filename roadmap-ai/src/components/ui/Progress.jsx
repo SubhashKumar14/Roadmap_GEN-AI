@@ -1,4 +1,4 @@
-import { cn } from '..utils.js'
+import { cn } from '../../lib/utils.js'
 
 const Progress = ({ className, value, ...props }) => (
   <div

@@ -1,5 +1,5 @@
-export { Button } from '.Button.jsx'
-export { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '.Card.jsx'
+export { Button } from './Button.jsx'
+export { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from './Card.jsx'
 export { Input } from './Input.jsx'
 export { Progress } from './Progress.jsx'
 export { Badge } from './Badge.jsx'

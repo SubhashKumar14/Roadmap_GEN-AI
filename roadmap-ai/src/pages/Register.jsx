@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
-import { useAuth } from '../hooks/useAuth.js'
-import { Button } from '..Button.jsx'
+import { useAuth } from '../hooks/useAuth.jsx'
+import { Button } from '../components/ui/Button.jsx'
 import { Input } from '../components/ui/Input.jsx'
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '.Card.jsx'
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../components/ui/Card.jsx'
 import { Loader2, Brain, Mail, Lock, User } from 'lucide-react'
 
 const Register = () => {
