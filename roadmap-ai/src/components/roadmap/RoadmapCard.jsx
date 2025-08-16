@@ -1,5 +1,5 @@
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '..Card.jsx'
-import { Button } from '..Button.jsx'
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../ui/Card.jsx'
+import { Button } from '../ui/Button.jsx'
 import { Progress } from '../ui/Progress.jsx'
 import { Badge } from '../ui/Badge.jsx'
 import { Calendar, Clock, Brain, Sparkles, Search, Trash2 } from 'lucide-react'
